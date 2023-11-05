@@ -12,35 +12,28 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Required packages
 ```{r warning=FALSE, message=FALSE}
+rm(list = ls())
 library(rvest)
 library(tidyverse)
 library(openxlsx)
+library(stringr)
 ```
 
 
 ```{r}
-first_verses <- list(
-  "GEN.1.SBA2015", "EXO.1.SBA2015", "LEV.1.SBA2015", "NUM.1.SBA2015",
-  "DEU.1.SBA2015", "JOS.1.SBA2015", "JDG.1.SBA2015", "RUT.1.SBA2015",
-  "1SA.1.SBA2015", "2SA.1.SBA2015", "1KI.1.SBA2015", "2KI.1.SBA2015",
-  "1CH.1.SBA2015", "2CH.1.SBA2015", "EZR.1.SBA2015", "NEH.1.SBA2015",
-  "EST.1.SBA2015", "JOB.1.SBA2015", "PSA.1.SBA2015", "PRO.1.SBA2015",
-  "ECC.1.SBA2015", "SNG.1.SBA2015", "ISA.1.SBA2015", "JER.1.SBA2015",
-  "LAM.1.SBA2015", "EZK.1.SBA2015", "DAN.1.SBA2015", "HOS.1.SBA2015",
-  "JOL.1.SBA2015", "AMO.1.SBA2015", "OBA.1.SBA2015", "JON.1.SBA2015",
-  "MIC.1.SBA2015", "NAM.1.SBA2015", "HAB.1.SBA2015", "ZEP.1.SBA2015",
-  "HAG.1.SBA2015", "ZEC.1.SBA2015", "MAL.1.SBA2015", "MAT.1.SBA2015",
-  "MRK.1.SBA2015", "LUK.1.SBA2015", "JHN.1.SBA2015", "ACT.1.SBA2015",
-  "ROM.1.SBA2015", "1CO.1.SBA2015", "2CO.1.SBA2015", "GAL.1.SBA2015",
-  "EPH.1.SBA2015", "PHP.1.SBA2015", "COL.1.SBA2015", "1TH.1.SBA2015",
-  "2TH.1.SBA2015", "1TI.1.SBA2015", "2TI.1.SBA2015", "TIT.1.SBA2015",
-  "PHM.1.SBA2015", "HEB.1.SBA2015", "JAS.1.SBA2015", "1PE.1.SBA2015",
-  "2PE.1.SBA2015", "1JN.1.SBA2015", "2JN.1.SBA2015", "3JN.1.SBA2015",
-  "JUD.1.SBA2015", "REV.1.SBA2015"
-)
+bible = "BIRD"
+all_books <- c("GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT", "1SA", 
+               "2SA", "1KI", "2KI", "1CH", "2CH", "EZR", "NEH", "EST", "JOB",
+               "PSA", "PRO", "ECC", "SNG", "ISA", "JER", "LAM", "EZK", "DAN", 
+               "HOS", "JOL", "AMO", "OBA", "JON", "MIC", "NAM", "HAB", "ZEP", 
+               "HAG", "ZEC", "MAL", "MAT", "MRK", "LUK", "JHN", "ACT", "ROM", 
+               "1CO", "2CO", "GAL", "EPH", "PHP", "COL", "1TH", "2TH", "1TI", 
+               "2TI", "TIT", "PHM", "HEB", "JAS", "1PE", "2PE", "1JN", "2JN", 
+               "3JN", "JUD", "REV")
+
+bible_num = 387
 
 # function that will detect the next verse if it exists
-prev_verse <- first_verses_fr[[1]]
 next_verse <- function(prev_verse){
   v <- strsplit(prev_verse, split = "\\.")[[1]]
   num <- as.numeric(v[2]) + 1
@@ -49,79 +42,66 @@ next_verse <- function(prev_verse){
   next_v <- paste(next_v, collapse = ".")
   return(next_v)
 }
+```
 
-sba <- 516
-get_all_sba <- lapply(first_verses, function(url){
-  verses <- list()
+
+```{r}
+get_verses <- function(bible, bible_num){
+  first_verses = first_verses <- as.list(paste0(all_books, ".1.", bible))
+  get_all_bible <- lapply(first_verses, function(url){
+    verses <- list()
   
-  while (TRUE) {
-    url_sba <- paste0("https://www.bible.com/bible/", sba, "/", url)
-    cat(url, "\n")
-  
-    links <- read_html(url_sba) %>% html_nodes("a") %>% html_attr("href")
-    text <- read_html(url_sba) %>% html_nodes("span") %>% html_text()
-    text <- text[text != ""]
-    num_indexes <- which(nchar(text) <= 4)
-    text <- text[-num_indexes]
-    idx_verses <- grep("^[1-9]", text)
-    text <- text[idx_verses]
+    while (TRUE) {
+      url_sba <- paste0("https://www.bible.com/bible/", bible_num, "/", url)
+      cat(url, "\n")
     
-    verses[[url]] <- text
-    check_next <- grep(url %>% next_verse(), links)
-    
-    if (length(check_next) != 0){
-      cat("The next chapter", url %>% next_verse(), "exists. Getting data ...\n")
-      url <- url %>% next_verse()
-      url_sba <- paste0("https://www.bible.com/bible/", version, "/", url)
-    } else {
-      cat("Moving to the next book.\n")
-      break
+      links <- read_html(url_sba) %>% html_nodes("a") %>% html_attr("href")
+      text <- read_html(url_sba) %>% html_nodes("span") %>% html_text()
+      text <- str_trim(text)
+      text <- text[grepl("^[0-9]{1,3}[A-Za-z()“‘]+", text)]
+      
+      verses[[url]] <- text
+      check_next <- grep(url %>% next_verse(), links)
+      
+      if (length(check_next) != 0){
+        cat("The next chapter", url %>% next_verse(), "exists. Getting data ...\n")
+        url <- url %>% next_verse()
+        url_sba <- paste0("https://www.bible.com/bible/", version, "/", url)
+      } else {
+        cat("Moving to the next book.\n")
+        break
+      }
     }
-  }
-  verses
-})
+    verses
+  })
+  
+  return(get_all_bible)
+}
+```
+
+
+```{r}
+# get_all_bible <- get_verses(bible, bible_num)
 ```
 
 
 ## Process the french version
 ```{r}
-first_verses_fr <- first_verses %>% 
-  lapply(function(x) gsub("SBA2015", "NEG79", x))
+translation <- "NIV"
+bible_tr_num <- 111
+get_all_bible <- get_verses(bible, bible_num)
+get_all_bible_tr <- get_verses(translation, bible_tr_num)
+# mussey <- get_verses("BMS", 1130)
 
-version <- 106
 
-prev_verse %>% next_verse()
+# function to remove cross-references
+remove_crossref <- function(x){
+  # x <- gsub("“|‘", "", x)
+  x[grepl("^[0-9]{1,3}[A-Za-z()“‘]+", x)]
+}
 
-get_all_fr <- lapply(first_verses_fr, function(url){
-  verses <- list()
-  
-  while (TRUE) {
-    url_fr <- paste0("https://www.bible.com/bible/", version, "/", url)
-    cat(url, "\n")
-  
-    links_fr <- read_html(url_fr) %>% html_nodes("a") %>% html_attr("href")
-    text_fr <- read_html(url_fr) %>% html_nodes("span") %>% html_text()
-    text_fr <- text_fr[text_fr != ""]
-    num_indexes <- which(nchar(text_fr) <= 4)
-    text_fr <- text_fr[-num_indexes]
-    idx_verses <- grep("^[[:digit:]]+ [A-Z|a-z]", text_fr)
-    text_fr <- text_fr[idx_verses]
-    text_fr <- text_fr[!grepl("Soci??t?? Biblique de Gen??ve", text_fr)]
-    
-    verses[[url]] <- text_fr
-    check_next <- grep(url %>% next_verse(), links_fr)
-    
-    if (length(check_next) != 0){
-      cat("The next chapter", url %>% next_verse(), "exists. Getting data ...\n")
-      url <- url %>% next_verse()
-      url_fr <- paste0("https://www.bible.com/bible/", version, "/", url)
-    } else {
-      cat("Moving to the next book.\n")
-      break
-    }
-  }
-  verses
-})
+# x <- get_all_bible[[1]]$GEN.3.BIRD
+# remove_crossref(x)
 ```
 
 
@@ -132,10 +112,10 @@ merge_all <- function(x_list){
     n <- names(list_element)
     to_dataframe <- lapply(n, function(i){
       chp_id <- paste0(strsplit(i, split = "\\.")[[1]][1:2], collapse = ".")
-      verse_id <- as.numeric(gsub("([0-9]+).*$", "\\1", list_element[[i]]))
+      verse_id <- as.numeric(gsub("([0-9]+).*$", "\\1", remove_crossref(list_element[[i]])))
       chapter <- data.frame(ChapterID = chp_id, 
                             VerseID = verse_id,
-                            Content = list_element[[i]])
+                            Content = remove_crossref(list_element[[i]]))
     })
   }) %>% bind_rows()
   return(x_list_processed)
@@ -144,32 +124,14 @@ merge_all <- function(x_list){
 # Number of verses by chapter
 
 
-sba_bible <- merge_all(get_all_sba)
-fr_bible <- merge_all(get_all_fr)
+all_bible <- merge_all(get_all_bible)
+all_bible_tr <- merge_all(get_all_bible_tr)
 
 # Merge all
-data <- sba_bible %>% left_join(fr_bible, by = c("ChapterID", "VerseID")) %>% 
-  rename(Content_SBA = Content.x, Content_Fr = Content.y)
-View(data)
+data <- all_bible %>% full_join(all_bible_tr, by = c("ChapterID", "VerseID")) %>% 
+  rename(Content = Content.x, Translation = Content.y)
+# View(data)
 
 
 write.xlsx(data, "scrapped_Bible.xlsx")
 ```
-
-
-## Detecting matching problems
-```{r}
-# to be checked manually
-to_be_checked <- data %>% filter(is.na(Content_Fr)) %>% 
-  select(ChapterID, VerseID)
-
-write.xlsx(to_be_checked, "to_be_checked.xlsx")
-```
-
-Solutions:
-
-1. Open the two excel files 
-
-2. Get the verse ID from to_be_checked.xlsx and check what could be the problem in scrapped_Bible.xlsx
-
-3. Copy the missing verse from online bible and paste it to the Excel document.
